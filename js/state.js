@@ -1,6 +1,6 @@
 (function () {
   const KEY = "bailu_museum_v4";
-  const VERSION = 4;
+  const VERSION = 5;
   const defaults = {
     version: VERSION,
     playerName: "",
@@ -11,7 +11,9 @@
     testAccess: false,
     visits: [],
     failures: {},
-    ending: "",
+    transitionSeen: [],
+    supportAutoSeen: false,
+    endingComplete: false,
     sound: true,
   };
   function cloneDefaults() {
@@ -20,7 +22,19 @@
   function load() {
     try {
       const saved = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (!saved || saved.version !== VERSION) return cloneDefaults();
+      if (!saved) return cloneDefaults();
+      if (saved.version === 4) {
+        return {
+          ...cloneDefaults(),
+          ...saved,
+          version: VERSION,
+          transitionSeen: [],
+          supportAutoSeen: false,
+          endingComplete: false,
+          ending: undefined,
+        };
+      }
+      if (saved.version !== VERSION) return cloneDefaults();
       return { ...cloneDefaults(), ...saved };
     } catch {
       return cloneDefaults();
@@ -36,6 +50,12 @@
     save();
   }
   function has(id) { return state.visits.includes(id); }
+  function count(prefix) { return state.visits.filter((id) => id.startsWith(prefix)).length; }
+  function markTransition(id) {
+    if (!state.transitionSeen.includes(id)) state.transitionSeen.push(id);
+    save();
+  }
+  function transitionDone(id) { return state.transitionSeen.includes(id); }
   function fail(key) {
     state.failures[key] = (state.failures[key] || 0) + 1;
     save();
@@ -92,7 +112,32 @@
     return result;
   }
   function archiveReady() {
-    return ["resident:C-005", "resident:C-012", "child:K-2016-004", "child:K-2016-008", "child:K-2016-013", "debates"].every(has);
+    const residentAnchor = has("resident:C-005") || has("resident:C-012");
+    return residentAnchor && count("resident:") >= 2 && ["child:K-2016-004", "child:K-2016-008", "child:K-2016-013", "debates"].every(has);
   }
-  window.BAILU_STATE = { state, save, visit, has, fail, reset, hash: sha, archiveReady, key: KEY };
+  function publicSectionCount() {
+    return ["home", "museum", "exhibitions", "collections", "memories", "education", "guestbook", "service", "search"].filter((id) => has(id)).length;
+  }
+  function archiveSourceKnown() { return has("notice:n04") || has("exhibit:e03"); }
+  function childSourceKnown() { return has("education:future2016"); }
+  function nextTransition() {
+    if (!transitionDone("record-01")) {
+      const anomaly = has("notice:n04") || has("exhibit:e03");
+      const secondSource = has("education:future2016") || has("notice:n09") || has("guestbook:p5") || (has("notice:n04") && has("exhibit:e03"));
+      return state.staffReady && publicSectionCount() >= 3 && anomaly && secondSource ? "record-01" : "";
+    }
+    if (!transitionDone("record-02")) {
+      const person = has("resident:C-005") || has("resident:C-012");
+      const work = has("child:K-2016-004") || has("child:K-2016-008");
+      return state.archiveAccess && count("resident:") >= 3 && person && work ? "record-02" : "";
+    }
+    if (!transitionDone("record-03")) {
+      const mother = has("resident:C-005") || has("memory:m04");
+      const works = ["child:K-2016-004", "child:K-2016-008", "child:K-2016-013"].every(has);
+      return works && has("debates") && mother ? "record-03" : "";
+    }
+    if (!transitionDone("record-04")) return archiveReady() ? "record-04" : "";
+    return "";
+  }
+  window.BAILU_STATE = { state, save, visit, has, count, fail, reset, hash: sha, archiveReady, archiveSourceKnown, childSourceKnown, nextTransition, markTransition, transitionDone, key: KEY };
 })();
