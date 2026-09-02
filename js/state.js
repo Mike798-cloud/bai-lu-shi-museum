@@ -1,6 +1,6 @@
 (function () {
   const KEY = "bailu_museum_v4";
-  const VERSION = 5;
+  const VERSION = 6;
   const defaults = {
     version: VERSION,
     playerName: "",
@@ -15,6 +15,7 @@
     supportAutoSeen: false,
     endingComplete: false,
     sound: true,
+    readingAid: false,
   };
   function cloneDefaults() {
     return JSON.parse(JSON.stringify(defaults));
@@ -32,6 +33,14 @@
           supportAutoSeen: false,
           endingComplete: false,
           ending: undefined,
+        };
+      }
+      if (saved.version === 5) {
+        return {
+          ...cloneDefaults(),
+          ...saved,
+          version: VERSION,
+          readingAid: !!saved.readingAid,
         };
       }
       if (saved.version !== VERSION) return cloneDefaults();

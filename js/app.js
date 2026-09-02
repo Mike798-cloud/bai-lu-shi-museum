@@ -15,15 +15,29 @@
     "old-city.webp": "白鹭市老城区与沿河街道历史照片",
     "collection-table.webp": "收音机、车票、搪瓷饭盒等普通居民捐赠物",
     "children-gallery.webp": "2016年孩子眼中的城市展厅与儿童水彩作品墙",
-    "xiaoman-city.webp": "林小满儿童水彩作品我的城市",
-    "xiaoman-people.webp": "林小满儿童水彩作品我认识的人",
-    "xiaoman-future.webp": "林小满儿童水彩作品给未来的人看",
-    "xiaoman-desk.webp": "林小满在博物馆活动桌前画画的旧照片",
+    "xiaoman-city.webp": "水彩画：博物馆和一间鲜亮的蓝房子并排在街上，路上有骑车人和牵着孩子的家长",
+    "xiaoman-people.webp": "水彩画四格：修鞋人、售票员、夜班护士和手拿钥匙圈的展厅管理员都在工作",
+    "xiaoman-future.webp": "水彩画：几位职业不同的人背对画面看展，窗外有蓝房子，右侧留着未上色的小小人形空白",
+    "xiaoman-desk.webp": "2016年儿童活动照片：小满坐在展厅工作桌前画画",
+    "xiaoman-workshop.webp": "2016年儿童活动照片：小满背对镜头在桌前画一间蓝房子",
+    "xiaoman-palette.webp": "2016年儿童活动材料记录：残留蓝色颜料的调色盘、洗笔水与蓝房子水彩纸一角",
+    "xiaoman-bluehouse-back.webp": "2017年儿童水彩索引比对图：雨后的蓝房子背面，边缘留有未上色的人形空白",
   };
-  function img(file, cls = "content-photo", caption = "", linkable = true) {
+  const imageInfo = {
+    "xiaoman-city.webp": "儿童水彩《我的城市》。画面把博物馆、蓝房子、骑车的人、牵着孩子的家长和树并排画在同一条街上；蓝房子比实际建筑更亮，也比周围的房子更大。",
+    "xiaoman-people.webp": "儿童水彩《我认识的人》。四个格子里分别画着修鞋人、售票员、值夜班的护士和手拿钥匙圈的展厅管理员；每个人都在工作，而不是对着画者摆姿势。",
+    "xiaoman-future.webp": "儿童水彩《给未来的人看》。几位职业不同的人背对画面看着展墙；窗外能看见一间蓝房子。右侧留着一个没有上色、没有五官的小小人形空白。",
+    "xiaoman-desk.webp": "2016年活动记录照片。小满坐在展厅工作桌前作画，照片只记录公共活动现场，不能替代她之后的私人生活。",
+    "xiaoman-workshop.webp": "公开活动照片。小满背对镜头坐在长桌前，桌上有蓝色水彩、调色盘和一张尚未完成的蓝房子；她的脸没有入镜。",
+    "xiaoman-palette.webp": "公开活动材料记录。透明调色盘里残留多层蓝色颜料，旁边有洗笔水、两支画笔、铅笔和一张只露出蓝房子边角的水彩纸。",
+    "xiaoman-bluehouse-back.webp": "受限索引比对图。雨后的蓝房子背面、排水管、雨靴和两盆植物被画在纸上；画面边缘留着一个没有上色的小小人形空白。该图不属于三幅公开作品。",
+  };
+  function img(file, cls = "content-photo", caption = "", linkable = true, description = "") {
     const alt = imageAlt[file] || caption || "馆藏图片";
-    const picture = `<img src="assets/images/${file}" alt="${esc(alt)}" loading="lazy">`;
-    return `<figure class="archive-photo ${cls}">${linkable ? `<a href="assets/images/${file}" target="_blank" rel="noopener">${picture}</a>` : picture}${caption ? `<figcaption>${esc(caption)}</figcaption>` : ""}</figure>`;
+    const detail = description || imageInfo[file] || alt;
+    const picture = `<img src="assets/images/${esc(file)}" alt="${esc(alt)}" loading="lazy" decoding="async">`;
+    const media = linkable ? `<button class="image-open" type="button" data-image-file="${esc(file)}" data-image-caption="${esc(caption || alt)}" data-image-description="${esc(detail)}" aria-label="打开图像阅览：${esc(caption || alt)}">${picture}</button>` : picture;
+    return `<figure class="archive-photo ${cls}">${media}${caption ? `<figcaption>${esc(caption)}</figcaption>` : ""}</figure>`;
   }
   const TRANSITIONS = {
     "record-01": { no: "01", title: "旧图", lines: ["旧图片索引：48项。", "路径恢复：48项。", "作者姓名确认：47项。", "剩下的一张画，名字写在背面。"] },
@@ -37,14 +51,63 @@
     return (p === "home" && !id && !view) || (p === "admin" && (!view || view === "log")) || (p === "archive" && !view && S.archiveAccess) || (p === "residents" && !id && S.archiveAccess) || (p === "children" && !id && S.childAccess);
   }
   function removeNode(node) { if (node && node.parentNode) node.parentNode.removeChild(node); }
+  function modalFocusables(root) {
+    return $$('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])').filter((el) => root.contains(el) && !el.hidden && getComputedStyle(el).visibility !== "hidden");
+  }
+  function activateModal(overlay, close, initialFocus) {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const app = $("#app");
+    if (app) { app.setAttribute("aria-hidden", "true"); if ("inert" in app) app.inert = true; }
+    const onKeydown = (event) => {
+      if (event.key === "Escape") { event.preventDefault(); close(); return; }
+      if (event.key !== "Tab") return;
+      const nodes = modalFocusables(overlay);
+      if (!nodes.length) { event.preventDefault(); return; }
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    const onFocusin = (event) => {
+      if (overlay.contains(event.target)) return;
+      (initialFocus || modalFocusables(overlay)[0] || overlay).focus();
+    };
+    overlay.addEventListener("keydown", onKeydown);
+    overlay.addEventListener("click", (event) => { if (event.target === overlay) close(); });
+    document.addEventListener("focusin", onFocusin);
+    overlay._modalState = { opener, app, onKeydown, onFocusin };
+    document.body.classList.add("modal-open");
+    requestAnimationFrame(() => (initialFocus || modalFocusables(overlay)[0] || overlay).focus());
+  }
+  function deactivateModal(overlay) {
+    const state = overlay && overlay._modalState;
+    if (!state) return;
+    overlay.removeEventListener("keydown", state.onKeydown);
+    document.removeEventListener("focusin", state.onFocusin);
+    if (state.app) { state.app.removeAttribute("aria-hidden"); if ("inert" in state.app) state.app.inert = false; }
+    document.body.classList.remove("modal-open");
+    if (state.opener && document.contains(state.opener)) setTimeout(() => state.opener.focus(), 0);
+    delete overlay._modalState;
+  }
+  function showImageViewer(button) {
+    if ($("#imageViewer")) return;
+    const file = button.dataset.imageFile, caption = button.dataset.imageCaption || imageAlt[file] || "馆藏图片", description = button.dataset.imageDescription || imageInfo[file] || imageAlt[file] || "";
+    if (!file) return;
+    document.body.insertAdjacentHTML("beforeend", `<div id="imageViewer" class="image-viewer-overlay" role="dialog" aria-modal="true" aria-labelledby="imageViewerTitle" aria-describedby="imageViewerDescription" tabindex="-1"><div class="image-viewer-window"><header><h2 id="imageViewerTitle">${esc(caption)}</h2><button id="imageViewerClose" type="button" aria-label="关闭图像阅览">关闭</button></header><figure><img src="assets/images/${esc(file)}" alt="${esc(imageAlt[file] || caption)}"><figcaption id="imageViewerDescription">${esc(description)}</figcaption></figure><footer><span>图像说明可由读屏软件读取；按 Esc 或“关闭”返回原页面。</span></footer></div></div>`);
+    const overlay = $("#imageViewer");
+    const close = () => { deactivateModal(overlay); removeNode(overlay); };
+    $("#imageViewerClose").onclick = close;
+    activateModal(overlay, close, $("#imageViewerClose"));
+  }
   function showTransition(id, replay = false) {
     const item = TRANSITIONS[id];
     if (!item || $("#transitionOverlay")) return false;
     if (!replay) G.markTransition(id);
-    document.body.insertAdjacentHTML("beforeend", `<div id="transitionOverlay" class="transition-overlay" role="dialog" aria-modal="true" aria-label="整理记录 ${item.no}"><div class="transition-window"><header><span>BAILU MUSEUM / DIGITAL ARCHIVE</span><button id="transitionClose" type="button">关闭记录</button></header><main><small>数字资料整理记录 ${item.no}</small><h1>${esc(item.title)}</h1>${item.lines.map((line, i) => `<p class="transition-line" style="--line:${i}">${esc(line)}</p>`).join("")}</main><footer><span>本记录仅整理已经读取的资料，不改变原始档案。</span><button id="transitionReveal" type="button">完整显示文字</button></footer></div></div>`);
+    document.body.insertAdjacentHTML("beforeend", `<div id="transitionOverlay" class="transition-overlay" role="dialog" aria-modal="true" aria-labelledby="transitionTitle" aria-describedby="transitionDescription" tabindex="-1"><div class="transition-window"><header><span>BAILU MUSEUM / DIGITAL ARCHIVE</span><button id="transitionClose" type="button" aria-label="关闭整理记录">关闭记录</button></header><main><small>数字资料整理记录 ${item.no}</small><h1 id="transitionTitle">${esc(item.title)}</h1>${item.lines.map((line, i) => `<p class="transition-line" style="--line:${i}">${esc(line)}</p>`).join("")}</main><footer><span id="transitionDescription">本记录仅整理已经读取的资料，不改变原始档案。按 Esc 可关闭。</span><button id="transitionReveal" type="button">完整显示文字</button></footer></div></div>`);
     const overlay = $("#transitionOverlay");
-    $("#transitionClose").onclick = () => removeNode(overlay);
+    const close = () => { deactivateModal(overlay); removeNode(overlay); };
+    $("#transitionClose").onclick = close;
     $("#transitionReveal").onclick = () => { overlay.classList.add("show-all"); $("#transitionReveal").disabled = true; };
+    activateModal(overlay, close, $("#transitionClose"));
     return true;
   }
   function maybeShowTransition() {
@@ -73,6 +136,8 @@
   function hideSupport() {
     const overlay = $("#supportOverlay");
     if (!overlay) return;
+    overlay.setAttribute("aria-hidden", "true");
+    deactivateModal(overlay);
     overlay.classList.remove("show");
     setTimeout(() => removeNode(overlay), 330);
   }
@@ -81,11 +146,12 @@
     if (hasSupported()) { if (manual) supportToast("已经收到你的支持，谢谢你让下一座城市继续留下档案。"); return; }
     S.supportAutoSeen = true;
     G.save();
-    document.body.insertAdjacentHTML("beforeend", `<div id="supportOverlay" class="support-overlay" role="dialog" aria-modal="true" aria-label="支持作品"><div class="support-window"><header><b>${esc(D.support.title)}</b><button id="supportClose" type="button" aria-label="关闭">×</button></header><div class="support-inner"><div class="support-heading"><span>♡</span><strong>${esc(D.support.price)} 自愿打赏</strong><span>♡</span></div><div class="support-main"><figure><img src="assets/images/support-qr.png" alt="收款码"></figure><p class="support-scan">请使用 <b>某宝</b> 扫码支持 ${esc(D.support.price)}</p><div class="support-copy"><p>你好，我是 ${esc(D.support.studio)} 的独立开发者。</p><p>为了让这座不存在的博物馆像真的存在过，我反复整理了每一条留言、每一张登记卡和每一幅画。如果你在浏览这些旧页面时感受到了一点触动，愿意支持1元，那会成为我继续创作的动力。</p><p class="support-note">1块钱买不到一张博物馆门票，但能让下一座不存在的城市继续留下档案。</p></div></div><footer><p>本作可以完整免费游玩。弹窗只自动出现一次，清除浏览器数据后可能重新出现。</p><div><button id="supportDone" class="support-primary" type="button">已完成支持 ♡</button><button id="supportLater" type="button">下次一定</button></div><small>${esc(D.support.studio)}</small></footer></div></div></div>`);
+    document.body.insertAdjacentHTML("beforeend", `<div id="supportOverlay" class="support-overlay" role="dialog" aria-modal="true" aria-labelledby="supportTitle" aria-describedby="supportDescription" tabindex="-1"><div class="support-window"><header><b id="supportTitle">${esc(D.support.title)}</b><button id="supportClose" type="button" aria-label="关闭支持窗口">×</button></header><div class="support-inner"><div class="support-heading"><span aria-hidden="true">♡</span><strong>${esc(D.support.price)} 自愿打赏</strong><span aria-hidden="true">♡</span></div><div class="support-main"><figure><img src="assets/images/support-qr.png" alt="支持作品的收款二维码"></figure><p class="support-scan">请使用 <b>某宝</b> 扫码支持 ${esc(D.support.price)}</p><div id="supportDescription" class="support-copy"><p>你好，我是 ${esc(D.support.studio)} 的独立开发者。</p><p>为了让这座不存在的博物馆像真的存在过，我反复整理了每一条留言、每一张登记卡和每一幅画。如果你在浏览这些旧页面时感受到了一点触动，愿意支持1元，那会成为我继续创作的动力。</p><p class="support-note">1块钱买不到一张博物馆门票，但能让下一座不存在的城市继续留下档案。</p></div></div><footer><p>本作可以完整免费游玩。弹窗只自动出现一次，清除浏览器数据后可能重新出现。</p><div><button id="supportDone" class="support-primary" type="button">已完成支持 ♡</button><button id="supportLater" type="button">下次一定</button></div><small>${esc(D.support.studio)}</small></footer></div></div></div>`);
     const overlay = $("#supportOverlay");
     $("#supportClose").onclick = hideSupport;
     $("#supportLater").onclick = hideSupport;
     $("#supportDone").onclick = () => { markSupported(); hideSupport(); supportToast("感谢你的支持。蓝房子还会继续挂在这里。"); };
+    activateModal(overlay, hideSupport, $("#supportClose"));
     requestAnimationFrame(() => overlay.classList.add("show"));
   }
   function maybeAutoSupport() {
@@ -106,14 +172,14 @@
       ["memories.html", "城市记忆", "memories"], ["education.html", "教育推广", "education"],
       ["guestbook.html", "游客留言", "guestbook"], ["service.html", "游客服务", "service"],
     ];
-    return `<div class="utility"><span>白鹭市文化和旅游局直属单位</span><span>今天是 2026年9月2日　星期三</span></div><header class="site-head"><div class="brand"><a href="index.html"><span class="egret">白鹭</span><b>${D.site.name}</b><small>${D.site.english}</small></a></div><div class="head-tools"><form id="headSearch"><label for="headQ">站内检索</label><input id="headQ" value="${esc(qs("q"))}" placeholder="请输入关键词"><button>搜索</button></form><span>中文　|　English</span></div></header><nav class="main-nav">${items.map(([u, t, p]) => `<a class="${page() === p ? "current" : ""}" href="${u}">${t}</a>`).join("")}</nav><div class="pathbar"><span>当前位置：</span><a href="index.html">首页</a><b> &gt; ${document.title.split(" - ")[0]}</b></div>`;
+    return `<div class="utility"><span>白鹭市文化和旅游局直属单位</span><span>今天是 2026年9月2日　星期三</span></div><header class="site-head"><div class="brand"><a href="index.html"><span class="egret">白鹭</span><b>${D.site.name}</b><small>${D.site.english}</small></a></div><div class="head-tools"><form id="headSearch"><label for="headQ">站内检索</label><input id="headQ" value="${esc(qs("q"))}" placeholder="请输入关键词" autocomplete="off"><button>搜索</button></form><span>中文　|　English</span></div></header><nav class="main-nav" aria-label="主要栏目">${items.map(([u, t, p]) => `<a class="${page() === p ? "current" : ""}" href="${u}"${page() === p ? " aria-current=\"page\"" : ""}>${t}</a>`).join("")}</nav><div class="pathbar"><span>当前位置：</span><a href="index.html">首页</a><b> &gt; ${document.title.split(" - ")[0]}</b></div>`;
   }
   function footer() {
-    return `<footer class="site-footer"><div class="footer-info"><b>${D.site.name}</b><span>地址：${D.site.address}</span><span>电话：${D.site.phone}</span></div><div class="footer-tools"><a href="museum.html?view=contact">联系我们</a><a href="admin.html">网站维护</a><button data-support type="button">支持作品 1元</button><button id="soundToggle" type="button">网页声音：${S.sound ? "开" : "关"}</button><button id="resetSite" type="button">清除本机记录</button></div><p>© 2008-2026 白鹭市博物馆　网站最后改版：2016-05-08　访问人数 ${D.site.counter}</p></footer>`;
+    return `<footer class="site-footer"><div class="footer-info"><b>${D.site.name}</b><span>地址：${D.site.address}</span><span>电话：${D.site.phone}</span></div><nav class="footer-tools" aria-label="网站工具"><a href="museum.html?view=contact">联系我们</a><a href="admin.html">网站维护</a><button data-support type="button">支持作品 1元</button><button id="soundToggle" type="button" aria-pressed="${S.sound}">网页声音：${S.sound ? "开" : "关"}</button><button data-reading-aid type="button" aria-pressed="${S.readingAid}">易读模式：${S.readingAid ? "开" : "关"}</button><button id="resetSite" type="button">清除本机记录</button></nav><p>© 2008-2026 白鹭市博物馆　网站最后改版：2016-05-08　访问人数 ${D.site.counter}</p></footer>`;
   }
   function shell(content, options = {}) {
-    document.body.className = options.system ? "system-page" : "museum-site";
-    $("#app").innerHTML = options.system ? content : `<div class="site-wrap">${nav()}<main class="site-main">${content}</main>${footer()}</div>`;
+    document.body.className = `${options.system ? "system-page" : "museum-site"}${S.readingAid ? " reading-aid" : ""}`;
+    $("#app").innerHTML = options.system ? `<a class="skip-link" href="#systemMain">跳到系统正文</a>${content}` : `<a class="skip-link" href="#mainContent">跳到正文</a><div class="site-wrap">${nav()}<main id="mainContent" class="site-main" tabindex="-1">${content}</main>${footer()}</div>`;
     bindCommon();
     if (!maybeShowTransition()) maybeAutoSupport();
   }
@@ -125,7 +191,9 @@
     const reset = $("#resetSite");
     if (reset) reset.onclick = () => { if (confirm("清除本设备上的整理记录并重新开始？")) { G.reset(); go("index.html"); } };
     $$('[data-support]').forEach((button) => button.onclick = () => showSupport(true));
+    $$('[data-reading-aid]').forEach((button) => button.onclick = () => { S.readingAid = !S.readingAid; G.save(); location.reload(); });
     $$('[data-replay-transition]').forEach((button) => button.onclick = () => showTransition(button.dataset.replayTransition, true));
+    $$(".image-open").forEach((button) => button.onclick = () => showImageViewer(button));
     if (S.sound) $$('a[href],button').forEach((el) => el.addEventListener("click", softClick, { once: true }));
   }
   function softClick() {
@@ -207,7 +275,8 @@
     G.visit(v === "future2016" ? "education:future2016" : "education");
     const menu = side("教育推广", [["education.html", "活动介绍"], ["education.html?view=future2016", "2016活动回顾"], ["children.html", "儿童作品旧库"], ["exhibitions.html?id=e03", "孩子眼中的城市"]]);
     if (v === "future2016") {
-      shell(`<div class="two-col">${menu}<article class="article education-poster"><div class="poster-year">2016</div><h1>给未来的人看</h1><p class="poster-en">FOR THE FUTURE · CHILDREN'S CITY PROJECT</p>${img("children-gallery.webp", "article-photo", "2016年儿童作品展厅") }<p>活动邀请孩子访问白鹭旧城、公交站、居民店铺和博物馆，并用水彩记录“希望未来还能看见的人和地方”。</p><table class="info-table"><tr><th>活动时间</th><td>2016年5月—7月</td></tr><tr><th>合作学校</th><td>南桥小学等5所学校</td></tr><tr><th>展览名称</th><td>孩子眼中的城市</td></tr><tr><th>资料代号</th><td>FUTURE / 2016</td></tr></table><div class="archive-entry"><b>旧活动资料</b><p>部分作品仍在旧版儿童活动数据库。迁移记录显示只读账号为 child_project，活动代号沿用英文名称与举办年份。</p><a href="children.html">进入儿童活动数据库</a></div></article></div>`);
+      const visual = D.xiaoman.visuals;
+      shell(`<div class="two-col">${menu}<article class="article education-poster"><div class="poster-year">2016</div><h1>给未来的人看</h1><p class="poster-en">FOR THE FUTURE · CHILDREN'S CITY PROJECT</p>${img("children-gallery.webp", "article-photo", "2016年儿童作品展厅") }<p>活动邀请孩子访问白鹭旧城、公交站、居民店铺和博物馆，并用水彩记录“希望未来还能看见的人和地方”。</p><table class="info-table"><tr><th>活动时间</th><td>2016年5月—7月</td></tr><tr><th>合作学校</th><td>南桥小学等5所学校</td></tr><tr><th>展览名称</th><td>孩子眼中的城市</td></tr><tr><th>资料代号</th><td>FUTURE / 2016</td></tr></table><section class="activity-evidence" aria-labelledby="activityVisualTitle"><h2 id="activityVisualTitle">活动图像记录</h2><p>以下两项只记录活动现场与材料：它们说明有人曾在这里画画，不替代孩子后来没有交给公众的生活。</p><div class="activity-visual-grid">${img(visual.workshop.file, "activity-visual", visual.workshop.caption, true, visual.workshop.description)}${img(visual.palette.file, "activity-visual", visual.palette.caption, true, visual.palette.description)}</div><blockquote class="child-fragment"><small>${esc(D.xiaoman.fragments[0].source)}</small><p>“${esc(D.xiaoman.fragments[0].text)}”</p><span>苏玉兰在旁边补记：她不肯换新发的群青，说新的蓝色是“别人家的蓝”。</span></blockquote></section><div class="archive-entry"><b>旧活动资料</b><p>部分作品仍在旧版儿童活动数据库。迁移记录显示只读账号为 child_project，活动代号沿用英文名称与举办年份。</p><a href="children.html">进入儿童活动数据库</a></div></article></div>`);
     } else {
       shell(`<div class="two-col">${menu}<section class="listing"><h1>教育推广</h1><div class="education-hero">${img("children-gallery.webp", "wide-photo")}<div><h2>让孩子用自己的眼睛记录城市</h2><p>本馆面向学校和家庭开展城市观察、口述史、水彩记录与藏品体验活动。</p></div></div><h2 class="subhead">近期与往期项目</h2><table class="event-table"><tr><th>2026</th><td><b>三十周年小小档案员</b><p>学习给家庭旧物编写一张完整登记卡。</p></td></tr><tr><th>2024</th><td><b>消失街道门牌拓印</b><p>从旧地图寻找已经改变的街巷。</p></td></tr><tr><th>2019</th><td><b>听见家里的声音</b><p>在家长许可下记录一段家庭声音。</p></td></tr><tr><th>2016</th><td><a href="education.html?view=future2016"><b>给未来的人看</b></a><p>儿童城市观察与水彩项目。</p></td></tr></table></section></div>`);
     }
@@ -240,7 +309,7 @@
   function systemFrame(title, content, navLinks = []) {
     const type = title.includes("CHILD") ? "child" : title.includes("SPECIAL") ? "special" : title.includes("ARCHIVE") || title.includes("RESIDENT") ? "archive" : title.includes("TEST") ? "test" : "maintenance";
     const origin = { maintenance: "网站维护服务器 / 2016", archive: "旧资料服务器 / 2008", child: "儿童项目服务器 / 2016", special: "特别保存档案 / 限制访问", test: "网页测试环境 / 只读" }[type];
-    shell(`<div class="legacy-system system-${type}"><header><b>${esc(title)}</b><span>${origin}</span><em>${new Date().toISOString().slice(0, 10)}</em></header><nav>${navLinks.map(([u, t]) => `<a href="${u}">${esc(t)}</a>`).join("")}<a href="index.html">返回公开网站</a><button data-support type="button">支持作品 1元</button></nav><main>${content}</main><footer>当前系统：${esc(title)}　权限：READ ONLY　读取状态仅保存在本机。</footer></div>`, { system: true });
+    shell(`<div class="legacy-system system-${type}"><header><b>${esc(title)}</b><span>${origin}</span><em>${new Date().toISOString().slice(0, 10)}</em></header><nav aria-label="${esc(origin)}导航">${navLinks.map(([u, t]) => `<a href="${u}">${esc(t)}</a>`).join("")}<a href="index.html">返回公开网站</a><button data-support type="button">支持作品 1元</button><button data-reading-aid type="button" aria-pressed="${S.readingAid}">易读模式：${S.readingAid ? "开" : "关"}</button></nav><main id="systemMain" tabindex="-1">${content}</main><footer>当前系统：${esc(title)}　权限：READ ONLY　读取状态仅保存在本机。</footer></div>`, { system: true });
   }
   function loginBox(system, label, accountHint, extra = "") {
     return `<div class="login-box"><h1>${esc(label)}</h1><p>${extra}</p><form id="loginForm"><label>账号<input id="loginAccount" value="${esc(accountHint)}" autocomplete="username"></label><label>密码<input id="loginPassword" type="password" autocomplete="current-password"></label><button>登录</button></form><div id="loginMsg" class="login-msg" aria-live="polite"></div><small>系统：${esc(system)}　连续输入错误不会锁定账号。</small></div>`;
@@ -344,11 +413,15 @@
     if (x) {
       G.visit(`child:${id}`);
       const isX = x.name === "林小满";
-      const art = id === "K-2016-004" ? "xiaoman-city.webp" : id === "K-2016-008" ? "xiaoman-people.webp" : "xiaoman-future.webp";
-      let detail = `<article class="child-record"><header><span>${x.id}</span><em>${esc(x.status)}</em></header><h1>${esc(x.work)}</h1><table><tr><th>参与者</th><td>${esc(x.name)}</td><th>年龄</th><td>${esc(x.age)}</td></tr><tr><th>活动</th><td colspan="3">给未来的人看 / 2016</td></tr><tr><th>公开状态</th><td colspan="3">${esc(x.status)}</td></tr></table>${isX ? img(art, "child-art", `${x.name}，${x.age}岁，${x.work}`) : `<div class="unscanned">普通作品扫描件未纳入本次演示缓存，著录信息完整。</div>`}`;
-      if (id === "K-2016-004") detail += `<section class="paper-scan"><h2>教师观察记录</h2><p>${esc(D.xiaoman.teacher)}</p><p>她在画的背面写：“房子是蓝的，因为王叔说展厅关灯以后，蓝色最后才看不见。”</p></section>`;
-      if (id === "K-2016-008") detail += `<section class="paper-scan"><h2>作文节选：《我认识的人》</h2>${D.xiaoman.essay.map((p) => `<p>${esc(p)}</p>`).join("")}<div class="cross-ref"><b>人物索引 / 外部旧资料服务器</b>${S.archiveAccess ? `<a class="system-handoff" href="residents.html?id=C-005">林慧 / 护士 ↗</a><a class="system-handoff" href="residents.html?id=C-006">王建国 / 展厅管理员 ↗</a><a class="system-handoff" href="residents.html?id=C-012">苏玉兰 / 教师 ↗</a>` : `<span>需先从公开迁移公告进入旧版资料系统。</span>`}</div></section>`;
-      if (id === "K-2016-013") detail += `<section class="paper-scan restricted"><h2>未展出原因</h2><p>作品背面同时写有五名居民姓名，2016年整理时未完成逐项授权，因此只保留索引。</p><p>2017年补录备注：母亲来信希望蓝房子继续保留，孩子因治疗暂停活动。</p><blockquote>${esc(D.xiaoman.motherPublic)}</blockquote></section>`;
+      const artById = { "K-2016-004": "xiaoman-city.webp", "K-2016-008": "xiaoman-people.webp", "K-2016-013": "xiaoman-future.webp", "K-2017-021": D.xiaoman.visuals.bluehouseBack.file };
+      const art = artById[id] || "xiaoman-future.webp";
+      const restrictedPreview = id === "K-2017-021";
+      const artDescription = restrictedPreview ? D.xiaoman.visuals.bluehouseBack.description : "";
+      let detail = `<article class="child-record"><header><span>${x.id}</span><em>${esc(x.status)}</em></header><h1>${esc(x.work)}</h1><table aria-label="${esc(x.work)}著录信息"><tr><th>参与者</th><td>${esc(x.name)}</td><th>年龄</th><td>${esc(x.age)}</td></tr><tr><th>活动</th><td colspan="3">给未来的人看 / 2016</td></tr><tr><th>公开状态</th><td colspan="3">${esc(x.status)}</td></tr></table>${isX ? img(art, `child-art${restrictedPreview ? " restricted-preview" : ""}`, `${x.name}，${x.age}岁，${x.work}`, !restrictedPreview, artDescription) : `<div class="unscanned">普通作品扫描件未纳入本次演示缓存，著录信息完整。</div>`}`;
+      if (id === "K-2016-004") detail += `<section class="paper-scan"><h2>教师观察记录</h2><p>${esc(D.xiaoman.teacher)}</p><p>她在画的背面写：“${esc(D.xiaoman.fragments[1].text)}”</p><details class="record-details"><summary>查看活动材料记录</summary>${img(D.xiaoman.visuals.palette.file, "record-evidence", D.xiaoman.visuals.palette.caption, true, D.xiaoman.visuals.palette.description)}<p>苏玉兰的收尾记录写着：小满把调色盘里剩下的蓝分开留着，不许别人把它们倒进同一杯洗笔水。</p></details></section>`;
+      if (id === "K-2016-008") detail += `<section class="paper-scan"><h2>作文节选：《我认识的人》</h2>${D.xiaoman.essay.map((p) => `<p>${esc(p)}</p>`).join("")}<details class="record-details"><summary>查看活动现场记录</summary>${img(D.xiaoman.visuals.workshop.file, "record-evidence", D.xiaoman.visuals.workshop.caption, true, D.xiaoman.visuals.workshop.description)}<p>这张照片只说明她在那天下午坐在活动桌前；它不是她完整的人生，也不能替代她没有提交的任何东西。</p></details><div class="cross-ref"><b>人物索引 / 外部旧资料服务器</b>${S.archiveAccess ? `<a class="system-handoff" href="residents.html?id=C-005">林慧 / 护士 ↗</a><a class="system-handoff" href="residents.html?id=C-006">王建国 / 展厅管理员 ↗</a><a class="system-handoff" href="residents.html?id=C-012">苏玉兰 / 教师 ↗</a>` : `<span>需先从公开迁移公告进入旧版资料系统。</span>`}</div></section>`;
+      if (id === "K-2016-013") detail += `<section class="paper-scan restricted"><h2>未展出原因</h2><p>作品背面同时写有五名居民姓名，2016年整理时未完成逐项授权，因此只保留索引。</p><p>2017年补录备注：母亲来信希望蓝房子继续保留，孩子因治疗暂停活动。</p><blockquote>${esc(D.xiaoman.motherPublic)}</blockquote><p>它仍是小满主动交给活动的第三幅作品；未展出说明的是当时的授权范围，不是她有没有来过。</p></section>`;
+      if (id === "K-2017-021") detail += `<section class="paper-scan restricted"><h2>仅索引比对说明</h2><p>此低清比对图用于确认同一参与者的材料编号。它不属于2016年活动提交的三幅作品，也没有公开或留存授权。</p><p>当前只读会话能看到它，是为了区分“看见一张像她的画”与“取得一张可以留下的画”。请勿作为公开图片复制。</p><blockquote><small>${esc(D.xiaoman.fragments[2].source)}</small><br>“${esc(D.xiaoman.fragments[2].text)}”</blockquote></section>`;
       detail += `<p><a href="children.html">返回活动记录</a></p></article>`;
       systemFrame("CHILD PROJECT DB 1.4", detail, [["children.html", "作品列表"], ["education.html?view=future2016", "公开活动页"]]);
       return;
@@ -372,6 +445,16 @@
     G.visit("special:D-001");
     const x = D.special;
     systemFrame("SPECIAL PRESERVATION ARCHIVE 1.1", `<article class="dossier"><div class="dossier-cover"><span>特别保存档案</span><b>${x.id}</b><h1>${esc(x.title)}</h1><p>接收日期 ${x.received}　文件 ${x.count}项　原始介质：移动硬盘</p></div><div class="privacy-warning"><b>请先阅读授权状态</b><p>${esc(x.note)}</p></div>${img("xiaoman-desk.webp", "dossier-photo", "2016年活动记录：林小满在展厅工作桌前") }<h2>档案内容构成</h2><table class="system-table"><thead><tr><th>类别</th><th>数量</th><th>授权状态</th></tr></thead><tbody>${x.categories.map((r) => `<tr class="${r[2].includes("未见") || r[2].includes("要求") ? "alert-row" : ""}"><td>${esc(r[0])}</td><td>${r[1]}</td><td>${esc(r[2])}</td></tr>`).join("")}</tbody></table><section class="life-timeline"><h2>从公开记录能够确认的事</h2><article><time>2016</time><p>九岁的林小满参加“给未来的人看”，主动提交三幅画。她在作文里写下自己为什么画普通人。</p></article><article><time>2017</time><p>她因治疗停止参加活动，请母亲转告博物馆：蓝房子的画要替她留着。</p></article><article><time>2018-04-12</time><p>林小满因病去世，终年十一岁。10月22日，林慧把家庭硬盘交给馆方临时代存，资料随后被完整复制为D-001。</p></article><article><time>2019—2026</time><p>档案一直没有正式公开，也没有完成归还。网站保存着它，却没有解决它属于谁。</p></article></section><section class="mother-letter"><small>原始邮件 / 访问级别：限制</small><h2>林慧写给馆方的话</h2><p>${esc(D.xiaoman.motherPrivate)}</p><span>状态：2026年整理时仍标记“待回复”</span></section><section class="final-work"><h2>她自己交给未来的东西</h2>${img("xiaoman-future.webp", "final-art", "《给未来的人看》，林小满，9岁") }<blockquote>“如果没有人画下来，以后可能就没人知道他们以前是什么样。”</blockquote></section><section class="final-review"><h2>原始授权复核</h2><p>馆方已联系林慧。根据她的书面确认，三幅由小满主动提交给活动的作品继续公开；私人录音、日记、通信和家庭硬盘登记归还。</p><p>这不是一道选择题。临时助理只需按原始授权完成最后一次复核。</p><button id="finalizeReview" type="button">按原始授权范围完成复核</button></section></article>`, []);
+    const dossierPhoto = $(".dossier-photo");
+    if (dossierPhoto) {
+      const visual = D.xiaoman.visuals.workshop;
+      dossierPhoto.insertAdjacentHTML("afterend", `<section class="dossier-public-visual" aria-labelledby="dossierPublicVisualTitle"><h2 id="dossierPublicVisualTitle">同一天下午的公开记录</h2>${img(visual.file, "dossier-supporting-photo", visual.caption, true, visual.description)}<p>这张照片与上方活动照都只来自公开活动材料：它让我们知道她曾在这里画蓝房子，也提醒我们，活动现场并不拥有她后来的一切。</p></section>`);
+    }
+    const dossierTimeline = $(".life-timeline");
+    if (dossierTimeline) {
+      dossierTimeline.insertAdjacentHTML("afterend", `<section class="dossier-fragments" aria-labelledby="dossierFragmentsTitle"><h2 id="dossierFragmentsTitle">公开记录里反复出现的小事</h2><ul>${D.xiaoman.fragments.slice(0, 2).map((fragment) => `<li><small>${esc(fragment.source)}</small><p>“${esc(fragment.text)}”</p></li>`).join("")}</ul><p>这些小事让人看见她的脾气、眼光和认真；它们不是一张通往私人录音、日记或母亲信件的通行证。</p></section>`);
+    }
+    $$(".dossier .image-open").forEach((button) => button.onclick = () => showImageViewer(button));
     $("#finalizeReview").onclick = () => { S.endingComplete = true; G.save(); go("ending.html"); };
   }
   function ending() {
@@ -379,8 +462,8 @@
     G.visit("ending:complete");
     const e = D.ending;
     const works = [["xiaoman-city.webp", "《我的城市》"], ["xiaoman-people.webp", "《我认识的人》"], ["xiaoman-future.webp", "《给未来的人看》"]];
-    const address = ["当你看到这段文字时，", "小满已经离开这个世界八年了。", "你没有见过她。", "你只知道她不吃葱，", "会因为别人动她的颜料生气，", "画画的时候，总把自己留在纸外。", "你没有听见她所有的声音，", "没有读完她所有的信，", "也没有得到她完整的一生。", "但一个人不必交出全部秘密，", "才能证明自己来过。", "她留给未来的，只有三幅画。", "你看到这里，已经足够。"];
-    shell(`<div class="ending-page"><header><small>白鹭市博物馆 · 网站公告存档</small><time>${e.date}</time><h1>${esc(e.notice)}</h1></header><section class="ending-update"><p>三个月后，2016年“孩子眼中的城市”旧图索引重新上线。</p><p>${esc(e.result)}</p></section><div class="ending-works">${works.map(([file, title]) => img(file, "ending-work", `${title}，林小满，2016年`, false)).join("")}</div><section class="mother-revision"><small>公开页文字校对 / 林慧</small><p>“${esc(e.motherNote)}”</p></section><section class="ending-address" id="endingAddress">${address.map((line, i) => `<p class="ending-line" style="--line:${i}">${esc(line)}</p>`).join("")}<button id="endingReveal" type="button">完整显示文字</button></section><div class="ending-closing"><p>儿童展厅照常开放。</p><p>蓝房子仍挂在原来的位置。</p></div><footer><button data-support type="button">支持作品 1元</button><button id="restart">清除记录并重新开始</button></footer></div>`, { system: true });
+    const address = ["当你看到这段文字时，", "小满已经离开这个世界八年了。", "你没有见过她。", "你只知道她不吃葱，", "会把挑出来的葱排整齐，", "会因为别人动她的颜料生气，", "画画的时候，总把自己留在纸外。", "你没有听见她所有的声音，", "没有读完她所有的信，", "也没有得到她完整的一生。", "但一个人不必交出全部秘密，", "才能证明自己来过。", "她留给未来的，只有三幅画。", "你看到这里，已经足够。"];
+    shell(`<div id="systemMain" class="ending-page" tabindex="-1"><header><small>白鹭市博物馆 · 网站公告存档</small><time>${e.date}</time><h1>${esc(e.notice)}</h1></header><section class="ending-update"><p>三个月后，2016年“孩子眼中的城市”旧图索引重新上线。</p><p>${esc(e.result)}</p></section><div class="ending-works">${works.map(([file, title]) => img(file, "ending-work", `${title}，林小满，2016年`, false)).join("")}</div><section class="mother-revision"><small>公开页文字校对 / 林慧</small><p>“${esc(e.motherNote)}”</p></section><section class="ending-address" id="endingAddress" aria-label="给参观者的最后一段文字">${address.map((line, i) => `<p class="ending-line" style="--line:${i}">${esc(line)}</p>`).join("")}<button id="endingReveal" type="button" aria-controls="endingAddress">完整显示文字</button></section><div class="ending-closing"><p>儿童展厅照常开放。</p><p>蓝房子仍挂在原来的位置。</p></div><footer><button id="restart">清除记录并重新开始</button></footer></div>`, { system: true });
     $("#endingReveal").onclick = () => { $("#endingAddress").classList.add("show-all"); $("#endingReveal").disabled = true; };
     $("#restart").onclick = () => { G.reset(); go("index.html"); };
   }
